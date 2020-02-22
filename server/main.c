@@ -19,7 +19,9 @@ void error(char *exit_msg) {
 int file_exist (char *filename)
 {
     struct stat   buffer;
-    return (stat (filename, &buffer) == 0);
+    int k = stat (filename, &buffer);
+    printf("size: %ld %d\n", buffer.st_size, k == 0);
+    return (k == 0);
 }
 
 char *dir = NULL;
@@ -46,44 +48,50 @@ void *connection_handler(void *socket_desc)
 {
     //Get the socket descriptor
     int sock = *(int*)socket_desc, read_size, segments = 0, file = 0;
-    char client_message[200], states[][4] = {"FILE", "CONF", "CONT", "EXIT"}, state = 0,
-         responses[][3] = {"Yes", "No"}, path[1000];
+    char client_message[200], *states[4] = {"FILE", "CONF", "CONT", "EXIT"}, state = 0,
+         *responses[2] = {"N", "Y"}, path[1000];
 
     //Receive a message from client
     while( (read_size = recv(sock , client_message , 200 , 0)) > 0 )
     {
-        if (strncmp(states[state], client_message, read_size) == 0) {
+        puts(client_message);
+        if (strncmp(states[state], client_message, 4) == 0) {
+            memset(client_message, 0, 1);
             if (state == 0) {
-                if ((read_size = recv(sock , client_message , 200 , 0)) < 0)
-                    break;
 
                 strcpy(path, dir);
-                client_message[read_size] = '\0';
-                strcpy(path + strlen(path), client_message);
-                puts(path);
+                client_message[read_size -1] = '\0';
+                strcpy(path + strlen(path), client_message + 6);
                 write(sock , responses[file_exist(path)] , strlen(path));
 
                 state = 1;
             } else if (state == 1) {
-                if ((read_size = recv(sock , client_message , 200 , 0)) < 0)
+                segments = atoi(client_message + 6);
+                puts(path);
+                if((file = open(path, O_RDONLY)) == -1) {
+                    error("Could not open file");
                     break;
-                segments = atoi(client_message);
-                file = open(path, O_RDONLY);
+                }
 
                 read_size = send_segments(sock, segments, file);
+                printf("%d\n", read_size);
 
-                if (read_size <= 0)
+                if (read_size == -1) {
+                    puts("breaking 1");
                     break;
+                }
 
                 state = 2;
             } else {
                 read_size = send_segments(sock, segments, file);
 
-                if (read_size == -1)
+                if (read_size == -1) {
+                    puts("breaking 2");
                     break;
+                }
 
                 if (close(file) != 0)
-                    perror("Couldn't close file");
+                    error("Couldn't close file");
                 state = 0;
             }
 
