@@ -23,10 +23,7 @@ void *connection_handler(void *socket_desc)
     char *message , client_message[2000];
 
     //Send some messages to the client
-    message = "Greetings! I am your connection handler\n";
-    write(sock , message , strlen(message));
-
-    message = "Now type something and i shall repeat what you type \n";
+    message = "Greetings! I am your connection handler\nNow type something and i shall repeat what you type \n";
     write(sock , message , strlen(message));
 
     //Receive a message from client
@@ -113,8 +110,6 @@ int main(int argc, char *argv[]) {
         puts("Connection accepted");
 
         //Reply to the client
-        char *message = "Hello Client , I have received your connection. And now I will assign a handler for you\n";
-        write(new_socket , message , strlen(message));
 
         pthread_t sniffer_thread;
         int *new_sock = malloc(1);

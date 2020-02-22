@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>	//inet_addr
+#include <string.h>
 
 void error(char *exit_msg) {
     perror(exit_msg);
@@ -59,6 +60,28 @@ int main(int argc, char *argv[]) {
         error("Connect error\n");
 
     puts("Connected");
+
+    char server_reply[2000];
+    int reply_size;
+    while ( (reply_size = recv(socket_desc, server_reply , 2000 , 0)) > 0)
+    {
+        server_reply[reply_size] = '\0';
+        printf("Server reply: %s\n",  server_reply);
+
+        char *line;
+        size_t size;
+        if ( getline(&line, &size, stdin) < 0)
+            break;
+
+        if( send(socket_desc , line , size , 0) < 0)
+        {
+            puts("Send failed");
+            break;
+        }
+    }
+
+    if (reply_size < 0)
+        puts("recv failed");
 
     // Finish connection when ready
     close(socket_desc);
