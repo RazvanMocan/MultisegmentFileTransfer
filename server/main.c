@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
     /*  Address Family - AF_INET (this is IP version 4)
     Type - SOCK_STREAM (this means connection oriented TCP protocol)
     Protocol - 0 [ or IPPROTO_IP This is IP protocol]*/
-    int socket_desc;
-    struct sockaddr_in server;
+    int socket_desc, new_socket;
+    struct sockaddr_in server, client;
 
     //Create socket
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
@@ -60,6 +60,18 @@ int main(int argc, char *argv[]) {
         error("Bind error\n");
 
     puts("Bind done");
+
+    //Listen
+    listen(socket_desc , 3);
+
+    //Accept and incoming connection
+    puts("Waiting for incoming connections...");
+    unsigned int c = sizeof(struct sockaddr_in);
+    new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+    if (new_socket == -1)
+        error("Accept failed");
+
+    puts("Connection accepted");
 
     // Finish connection when ready
     close(socket_desc);
