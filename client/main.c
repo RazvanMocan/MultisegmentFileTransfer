@@ -59,4 +59,8 @@ int main(int argc, char *argv[]) {
         error("Connect error\n");
 
     puts("Connected");
+
+    // Finish connection when ready
+    close(socket_desc);
+    return 0;
 }
