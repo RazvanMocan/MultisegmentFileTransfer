@@ -6,31 +6,94 @@
 #include <arpa/inet.h>	//inet_addr
 #include <pthread.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define SEGMENT 4096
 
 void error(char *exit_msg) {
     perror(exit_msg);
     exit(errno);
 }
 
+int file_exist (char *filename)
+{
+    struct stat   buffer;
+    return (stat (filename, &buffer) == 0);
+}
+
+char *dir = NULL;
+
+int send_segments(int sock, int segments, int file) {
+    int index = 0, read_size;
+    char msg[SEGMENT];
+    while ((read_size = read(file, msg, SEGMENT)) > 0) {
+        write(sock, msg, read_size);
+        index++;
+        if (index == segments )
+            break;
+        if (read_size == 0) {
+            write(sock , "DONE" , 4);
+            break;
+        }
+    }
+    return read_size;
+}
 /*
  * This will handle connection for each client
  * */
 void *connection_handler(void *socket_desc)
 {
     //Get the socket descriptor
-    int sock = *(int*)socket_desc;
-    int read_size;
-    char *message , client_message[2000];
-
-    //Send some messages to the client
-    message = "Greetings! I am your connection handler\nNow type something and i shall repeat what you type \n";
-    write(sock , message , strlen(message));
+    int sock = *(int*)socket_desc, read_size, segments = 0, file = 0;
+    char client_message[200], states[][4] = {"FILE", "CONF", "CONT", "EXIT"}, state = 0,
+         responses[][3] = {"Yes", "No"}, path[1000];
 
     //Receive a message from client
-    while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 )
+    while( (read_size = recv(sock , client_message , 200 , 0)) > 0 )
     {
-        //Send the message back to client
-        write(sock , client_message , read_size);
+        if (strncmp(states[state], client_message, read_size) == 0) {
+            if (state == 0) {
+                if ((read_size = recv(sock , client_message , 200 , 0)) < 0)
+                    break;
+
+                strcpy(path, dir);
+                client_message[read_size] = '\0';
+                strcpy(path + strlen(path), client_message);
+                puts(path);
+                write(sock , responses[file_exist(path)] , strlen(path));
+
+                state = 1;
+            } else if (state == 1) {
+                if ((read_size = recv(sock , client_message , 200 , 0)) < 0)
+                    break;
+                segments = atoi(client_message);
+                file = open(path, O_RDONLY);
+
+                read_size = send_segments(sock, segments, file);
+
+                if (read_size <= 0)
+                    break;
+
+                state = 2;
+            } else {
+                read_size = send_segments(sock, segments, file);
+
+                if (read_size == -1)
+                    break;
+
+                if (close(file) != 0)
+                    perror("Couldn't close file");
+                state = 0;
+            }
+
+        } else if (strncmp(states[3], client_message, read_size) == 0)
+            break;
+        else {
+            strcpy(client_message, "Wrong protocol, exiting ...");
+            write(sock , client_message , read_size);
+            break;
+        }
     }
 
     if(read_size == 0)
@@ -38,8 +101,6 @@ void *connection_handler(void *socket_desc)
         puts("Client disconnected");
         fflush(stdout);
     }
-    else if(read_size == -1)
-        error("recv failed");
 
     //Free the socket pointer
     free(socket_desc);
@@ -48,21 +109,21 @@ void *connection_handler(void *socket_desc)
 }
 
 int main(int argc, char *argv[]) {
-    char *port = NULL, *address = NULL;
+    char *port = NULL;
 
     if (argc <= 1)
         error("The command had no arguments.\n");
 
     int opt = 0;
-    while ((opt = getopt(argc, argv, "p:a:")) != -1) {
+    while ((opt = getopt(argc, argv, "p:f:")) != -1) {
         switch (opt) {
             case 'p':
                 port = optarg;
                 printf("Input option value=%s\n", port);
                 break;
-            case 'a':
-                address = optarg;
-                printf("Input option value=%s\n", address);
+            case 'f':
+                dir = optarg;
+                printf("Input option value=%s\n", dir);
                 break;
             case '?':
                 if (optopt == 'p')
