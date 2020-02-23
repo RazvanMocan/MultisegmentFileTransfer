@@ -5,7 +5,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>	//inet_addr
 #include <string.h>
-#define MAXSIZE 1024
+
+#define SEGMENT 1024
 
 void error(char *exit_msg) {
     perror(exit_msg);
@@ -42,7 +43,6 @@ int main(int argc, char *argv[]) {
     }
     char *token;
     int currPosition = 0;
-    char transferFile[4096 * MAXSIZE];
     static const char filename[] = "/home/razvan/Facultate/4th_year/2nd sem/DP/1st Project/client/config.txt";
     FILE *file = fopen ( filename, "r" );
     char lineArray[3][128];// [0] - fileName, [1] - segmentSize, [2] - Servers separated by coma
@@ -63,6 +63,8 @@ int main(int argc, char *argv[]) {
     {
         perror ( filename ); /* why didn't the file open? */
     }
+    int transferSize = SEGMENT * atoi(lineArray[1]);
+    char transferFile[transferSize];
 
 
 /*    Address Family - AF_INET (this is IP version 4)
@@ -126,32 +128,36 @@ int main(int argc, char *argv[]) {
         }
         else if(server_reply[0] == 'Y')
         {
-
-
-
-            if(send(socket_desc, commandSegSize, sizeof(commandSegSize), 0) < 0)
+            if(send(socket_desc, commandSegSize, strlen(commandSegSize), 0) < 0)
             {
                 puts("Send failed");
                 break;
             }
-            if(send(socket_desc, lineArray[1], sizeof(lineArray[1]), 0) < 0)
+            lineArray[1][strlen(lineArray[1]) - 1] = '\0';
+            if(send(socket_desc, lineArray[1], strlen(lineArray[1]), 0) < 0)
             {
                 puts("Send failed");
                 break;
             }
 
-            while((reply_size = recv(socket_desc, server_reply , 2000 , 0)) != 4 /*&& server_reply != "DONE"*/ && currPosition < 2 * 4096 * MAXSIZE)
+            FILE *fp;
+            fp=fopen(lineArray[0], "wb");
+            while((reply_size = recv(socket_desc, transferFile , transferSize , 0)) > 0)
             {
+                fwrite(transferFile, 1, reply_size, fp);
 
-                memcpy((transferFile + currPosition), server_reply, reply_size);
-                currPosition+=reply_size;
-                printf("pos: %d %d\n", currPosition, reply_size);
-                send(socket_desc, commandContinueSending, strlen(commandContinueSending), 0);
-
-                if (reply_size < 2000)
+                if (reply_size < transferSize) {
+                    if(recv(socket_desc, transferFile , transferSize , 0) > 0)
+                        if (strncmp("DONE", transferFile, 4) != 0)
+                            puts("File transfer had an error");
                     break;
-
+                }
+                else {
+                    send(socket_desc, commandContinueSending, strlen(commandContinueSending), 0);
+                }
+                memset(transferFile, 0, transferSize);
             }
+            fclose(fp);
         }
 
         //Mai trimitem EXIT?
@@ -161,13 +167,8 @@ int main(int argc, char *argv[]) {
         // Finish connection when ready
 
 
-
-
-
         close(socket_desc);
-        FILE *fp;
-        fp=fopen(lineArray[0], "wb");
-        fwrite(transferFile, 1, currPosition, fp);
+
         printf("Successful file transfer\n");
         break;
     }

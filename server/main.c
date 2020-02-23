@@ -9,7 +9,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define SEGMENT 4096
+//#define SEGMENT 4096
+#define SEGMENT 1024
 
 void error(char *exit_msg) {
     perror(exit_msg);
@@ -27,16 +28,14 @@ int file_exist (char *filename)
 char *dir = NULL;
 
 int send_segments(int sock, int segments, int file) {
-    int index = 0, read_size;
-    char msg[SEGMENT];
-    while ((read_size = read(file, msg, SEGMENT)) > 0) {
+    int read_size;
+    char msg[SEGMENT * segments];
+    if ((read_size = read(file, msg, segments * SEGMENT)) > 0) {
         write(sock, msg, read_size);
-        index++;
-        if (index == segments )
-            break;
-        if (read_size == 0) {
-            write(sock , "DONE" , 4);
-            break;
+        if (read_size == 0 || read_size < segments * SEGMENT) {
+            write(sock, "DONE", 4);
+            if (close(file) != 0)
+                error("Couldn't close file");
         }
     }
     return read_size;
@@ -52,32 +51,32 @@ void *connection_handler(void *socket_desc)
          *responses[2] = {"N", "Y"}, path[1000];
 
     //Receive a message from client
-    while( (read_size = recv(sock , client_message , 200 , 0)) > 0 )
+    while((read_size = (recv(sock , client_message , 200 , 0))) > 0 )
     {
         puts(client_message);
         if (strncmp(states[state], client_message, 4) == 0) {
-            memset(client_message, 0, 1);
             if (state == 0) {
 
                 strcpy(path, dir);
-                client_message[read_size -1] = '\0';
                 strcpy(path + strlen(path), client_message + 6);
+                path[strlen(path) - 1] = '\0';
+                puts(path);
                 write(sock , responses[file_exist(path)] , strlen(path));
 
                 state = 1;
             } else if (state == 1) {
-                segments = atoi(client_message + 6);
-                puts(path);
+                if ((read_size = recv(sock , client_message , 200 , 0)) < 0)
+                    break;
+                segments = atoi(client_message);
                 if((file = open(path, O_RDONLY)) == -1) {
                     error("Could not open file");
                     break;
                 }
 
-                read_size = send_segments(sock, segments, file);
-                printf("%d\n", read_size);
+;               read_size = send_segments(sock, segments, file);
 
                 if (read_size == -1) {
-                    puts("breaking 1");
+                    perror("breaking 1");
                     break;
                 }
 
@@ -90,11 +89,12 @@ void *connection_handler(void *socket_desc)
                     break;
                 }
 
-                if (close(file) != 0)
-                    error("Couldn't close file");
-                state = 0;
+                if (read_size == 0 || read_size < segments * SEGMENT)
+                    state = 0;
+                else
+                    state = 2;
             }
-
+            memset(client_message, 0, 200);
         } else if (strncmp(states[3], client_message, read_size) == 0)
             break;
         else {
