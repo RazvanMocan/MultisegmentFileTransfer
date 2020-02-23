@@ -1,0 +1,37 @@
+    if (argc <= 1)
+        error("The command had no arguments.\n");
+    char lineArray[3][128];// [0] - fileName, [1] - segmentSize, [2] - Servers separated by coma
+    int opt = 0;
+    while ((opt = getopt(argc, argv, "p:a:n:s:l:")) != -1) {
+        switch (opt) {
+            case 'p':
+                port = optarg;
+                printf("Input option value as=%s\n", port);
+                break;
+            case 'n':
+                strcpy(lineArray[0],optarg);
+                printf("File Name: %s\n", lineArray[0]);
+                break;
+            case 's':
+                strcpy(lineArray[1],optarg);
+                printf("Number segments: %s\n", lineArray[1]);
+                break;
+            case 'l':
+                strcpy(lineArray[2],optarg);
+                printf("Serv list: %s\n", lineArray[2]);
+                break;
+            case 'a':
+                address = optarg;
+                printf("Input option value ds=%s\n", address);
+                break;
+            case '?':
+                if (optopt == 'p')
+                    error("Missing port number\n");
+                else if (optopt == 'a')
+                    error("Missing IP address\n");
+                else
+                    error("Invalid option\n");
+            default:
+                error("Something is wrong with the arguments. Please check\n");
+        }
+    }
