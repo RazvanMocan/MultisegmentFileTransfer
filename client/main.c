@@ -146,8 +146,11 @@ int main(int argc, char *argv[]) {
                 memcpy((transferFile + currPosition), server_reply, reply_size);
                 currPosition+=reply_size;
                 printf("pos: %d %d\n", currPosition, reply_size);
-                send(socket_desc, commandContinueSending, strlen(commandContinueSending), 0);
-
+                if(send(socket_desc, commandContinueSending, strlen(commandContinueSending), 0) < 0)
+                {
+                    puts("Send failed");
+                    break;
+                }
                 if (reply_size < 2000)
                     break;
 
